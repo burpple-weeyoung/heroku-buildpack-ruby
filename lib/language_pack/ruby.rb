@@ -86,30 +86,58 @@ WARNING
     end
   end
 
+  # copied from https://stackoverflow.com/questions/19595840/rails-get-the-time-difference-in-hours-minutes-and-seconds/19596579
+  def time_diff(start_time, end_time)
+    seconds_diff = (start_time - end_time).to_i.abs
+
+    hours = seconds_diff / 3600
+    seconds_diff -= hours * 3600
+
+    minutes = seconds_diff / 60
+    seconds_diff -= minutes * 60
+
+    seconds = seconds_diff
+
+    "#{hours.to_s.rjust(2, '0')}:#{minutes.to_s.rjust(2, '0')}:#{seconds.to_s.rjust(2, '0')}"
+    # or, as hagello suggested in the comments:
+    # '%02d:%02d:%02d' % [hours, minutes, seconds]
+  end
+
+  def capture_timestamps(name)
+    dt_start = nil
+    dt_end = nil
+    puts "@@@ #{name} started @ #{dt_start = Time.now}"
+    yield
+    puts "@@@ #{name} ended @ #{dt_end = Time.now}"
+    puts "@@@ #{name} duration is #{time_diff(dt_start, dt_end)}"
+  end
+
   def compile
-    instrument 'ruby.compile' do
-      # check for new app at the beginning of the compile
-      new_app?
-      Dir.chdir(build_path)
-      remove_vendor_bundle
-      warn_bundler_upgrade
-      install_ruby
-      install_jvm
-      setup_language_pack_environment
-      setup_export
-      setup_profiled
-      allow_git do
-        install_bundler_in_app
-        build_bundler("development:test")
-        post_bundler
-        create_database_yml
-        install_binaries
-        run_assets_precompile_rake_task
+    capture_timestamps('compile') do
+      instrument 'ruby.compile' do
+        # check for new app at the beginning of the compile
+        new_app?
+        Dir.chdir(build_path)
+        capture_timestamps('remove_vendor_bundle') { remove_vendor_bundle }
+        capture_timestamps('warn_bundler_upgrade') { warn_bundler_upgrade }
+        capture_timestamps('install_ruby') { install_ruby }
+        capture_timestamps('install_jvm') { install_jvm }
+        capture_timestamps('setup_lang_pack_env') { setup_language_pack_environment }
+        capture_timestamps('setup_export') { setup_export }
+        capture_timestamps('setup_profiled') { setup_profiled }
+        allow_git do
+          capture_timestamps('install_bundler_in_app') { install_bundler_in_app }
+          capture_timestamps('build_bundler') { build_bundler("development:test") }
+          capture_timestamps('post_bundler') { post_bundler }
+          capture_timestamps('create_database_yml') { create_database_yml }
+          capture_timestamps('install_binaries') { install_binaries }
+          capture_timestamps('run_assets_precompile') { run_assets_precompile_rake_task }
+        end
+        capture_timestamps('config_detect') { config_detect }
+        capture_timestamps('best_practice_warning') { best_practice_warnings }
+        capture_timestamps('cleanup') { cleanup }
+        super
       end
-      config_detect
-      best_practice_warnings
-      cleanup
-      super
     end
   end
 
